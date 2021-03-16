@@ -1,0 +1,13 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+
+col_names <- c("dep", "pen_in_dep", "group", "animal_in_pen", "time", "weight")
+df <- read_table("dataMAS.txt", col_names = col_names, col_types = "fffffd")
+df %>% head()
+summary(df)
+```
