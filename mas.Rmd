@@ -1,0 +1,107 @@
+---
+title: "MAS"
+author: "The A-Team"
+date: "March 2021"
+output: pdf_document
+header-includes: 
+- \usepackage{graphicx}
+- \usepackage{float}
+- \usepackage{placeins}
+- \usepackage{amsmath}
+---
+
+```{r}
+library(lattice)
+library(magrittr)
+library(nlme)
+library(RCurl)
+library(tidyverse)
+```
+
+```{r}
+URL <- "https://raw.githubusercontent.com/cuboids/MAS/main/DataMAS.txt"
+dataMAS <- getURL(URL)
+col_names <- c("dep", "pen_in_dep", "group", "animal_in_pen", "time", "weight")
+df <- read_table(dataMAS, col_names = col_names, col_types = "ffffdd")
+df %<>% mutate(penID = as.factor(paste0(dep, group, pen_in_dep)),
+               animalID = as.factor(paste0(penID, animal_in_pen)),
+               logweight = log(weight))
+df %>% head()
+summary(df)
+```
+
+```{r}
+
+tapply(df$weight, list(df$time, df$group), mean)
+tapply(df$logweight, list(df$time, df$group), mean)
+tapply(df$weight, list(df$time, df$group), var)
+tapply(df$logweight, list(df$time, df$group), var)
+
+```
+
+
+
+```{r}
+
+# The poly(time, 3) model does not make much sense (and doesn't fit)
+
+model.time2 <- lme(weight ~ dep + group + poly(time, 2), 
+                   random = ~ 1|penID/animalID, data = df)
+
+model.int <- lme(weight ~ dep + group * poly(time, 2),
+                 random = ~ 1|penID/animalID, data = df)
+
+# Use ML for the LRT of models with different mean structure
+
+anova(update(model.time2, method="ML"), update(model.int, method="ML"))
+
+summary(model.int)
+
+```
+
+
+```{r}
+# residuals vs fitted
+# Discussion at 16.6.6 (p. 339)
+
+plot_resids <- function(model) {
+  plot(model, resid(., type = "n") ~ time | group,
+       type = c("p", "smooth"), lwd = 3)
+}
+
+plot_resids(model.int)
+```
+
+```{r}
+model.logint <- update(model.int, 
+                       fixed = logweight ~ dep + group * poly(time, 2))
+
+plot_resids(model.logint)
+```
+
+```{r}
+
+aug.Pred <- augPred(model.logint, primary = ~ time, level = 0:1,
+                    length.out = 2)
+plot(aug.Pred, layout = c(4, 4, 1),
+     key = list(lines = list(lty = c(1, 2)),
+                text = list(c("Marginal", "Subject-specific")),
+                columns = 2))
+
+```
+
+```{r}
+
+# (From now on, models will regress on log weight)
+
+# varPower ONLY makes sense for model.int, not for model.logint
+# model.varp <- update(model.int, weights = varPower(form = ~ time))
+
+# We need to check if this improves our model, c.f. 16.6.2
+model.coef <- update(model.logint, random = ~ time|penID/animalID)
+
+# AR1 is an okay idea, but phi1-hat = 0, so there's no AR.
+# model.ar10 <- update(model.coef, correlation = corAR1(form = ~ time|penID/animalID))
+
+
+```
