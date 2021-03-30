@@ -1,6 +1,6 @@
 ---
 title: "MAS"
-author: "The A-Team"
+author: ""
 date: "March 2021"
 output: pdf_document
 header-includes: 
